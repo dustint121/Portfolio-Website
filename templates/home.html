@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+
+{% block title %}Home &middot; Portfolio{% endblock %}
+{% block breadcrumb %}Home{% endblock %}
+
+{% block content %}
+<section class="intro">
+    <h2 class="intro-title">Welcome</h2>
+    <p class="intro-text">
+        This is my personal space for documenting projects, sharing notes, and thinking out loud.
+        Browse the sections in the sidebar to explore.
+    </p>
+</section>
+
+<section class="card-list" aria-label="Recent posts">
+    <article class="card">
+        <h3 class="card-title">Sample Post Title</h3>
+        <p class="card-excerpt">
+            A short excerpt for a recent post will appear here. 
+        </p>
+        <div class="card-meta">
+            <span class="meta-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                May 7, 2026
+            </span>
+            <span class="meta-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h6l2 2h10v11H3z"/></svg>
+                Projects
+            </span>
+        </div>
+    </article>
+
+    <article class="card">
+        <h3 class="card-title">Another Sample Post</h3>
+        <p class="card-excerpt">
+            Placeholder excerpt for demonstration. 
+        </p>
+        <div class="card-meta">
+            <span class="meta-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                May 1, 2026
+            </span>
+            <span class="meta-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h9l5 5v13H6z"/><path d="M14 3v6h6"/></svg>
+                Notes
+            </span>
+        </div>
+    </article>
+</section>
+{% endblock %}
