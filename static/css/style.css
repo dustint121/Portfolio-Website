@@ -160,6 +160,10 @@ a { color: inherit; text-decoration: none; }
 
 .icon-btn svg { width: 16px; height: 16px; }
 
+/* Theme toggle: show moon in dark mode, sun in light mode */
+:root[data-theme="dark"] #theme-toggle .icon-sun { display: none; }
+:root[data-theme="light"] #theme-toggle .icon-moon { display: none; }
+
 .icon-btn:hover {
     background: var(--surface-hover);
     color: var(--text);
