@@ -1,11 +1,12 @@
 <aside class="sidebar">
     <div class="sidebar-top">
         <div class="profile">
-            <div class="profile-image" aria-label="Profile photo placeholder">
-                <!-- Profile image left empty intentionally -->
+            <div class="profile-image" aria-label="Profile photo">
+                <img src="{{ profile_image_url }}" alt="Profile photo"
+                     onerror="this.style.display='none'">
             </div>
-            <h1 class="profile-name">Your Name</h1>
-            <p class="profile-tagline">Software Engineer &middot; Notes &amp; Projects</p>
+            <h1 class="profile-name">Dustin Tran</h1>
+            <p class="profile-tagline">Data Engineer &middot; Projects &amp; Notes</p>
         </div>
 
         <nav class="nav" aria-label="Primary">

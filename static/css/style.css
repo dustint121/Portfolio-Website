@@ -78,8 +78,15 @@ a { color: inherit; text-decoration: none; }
     background: var(--surface);
     border: 1px solid var(--border);
     margin: 0 auto 16px;
-    background-size: cover;
-    background-position: center;
+    overflow: hidden;
+}
+
+.profile-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 20%;  /* bias toward the face, not the chest */
+    display: block;
 }
 
 .profile-name {

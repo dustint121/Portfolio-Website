@@ -280,6 +280,38 @@ def get_post_by_slug(section, slug, use_cache=True):
 def clear_cache():
     """Drop the in-memory cache so the next read goes back to S3."""
     _cache.clear()
+    _binary_cache.clear()
+
+
+# Cache for arbitrary binary objects (e.g. the profile image).
+# _binary_cache : dict mapping str (key) -> tuple(float timestamp, bytes data, str content_type)
+_binary_cache = {}
+# How long (seconds) to cache binary objects. int.
+BINARY_CACHE_TTL_SECONDS = 3600
+def get_binary(key, use_cache=True):
+    """Fetch any object from the bucket as raw bytes.
+    Inputs:
+        key       : str  - full S3 key, e.g. "profile_image.jpg"
+        use_cache : bool
+    Output: tuple (data, content_type)
+        data         : bytes
+        content_type : str (e.g. "image/jpeg"), "" if unknown
+    Raises: botocore.exceptions.ClientError if the object is missing.
+    """
+    now = time.time()  # float
+    if use_cache:
+        cached = _binary_cache.get(key)  # tuple or None
+        if cached and (now - cached[0]) < BINARY_CACHE_TTL_SECONDS:
+            return cached[1], cached[2]
+        
+    client = get_client()
+    obj = client.get_object(Bucket=BUCKET_NAME, Key=key)  # dict
+    data = obj["Body"].read()                              # bytes
+    content_type = obj.get("ContentType") or ""           # str
+
+    if use_cache:
+        _binary_cache[key] = (now, data, content_type)
+    return data, content_type
 
 
 def list_all_posts():

@@ -1,7 +1,11 @@
-from flask import Flask, abort, jsonify, render_template
+from flask import Flask, Response, abort, jsonify, render_template
+from botocore.exceptions import ClientError
 
 import storage
 from rendering import render_markdown
+
+# S3 key for the profile picture stored at the bucket root. str.
+PROFILE_IMAGE_KEY = "profile_image.jpg"
 
 app = Flask(__name__)
 
@@ -42,6 +46,31 @@ def post_page(section, slug):
         post=post,
         body_html=body_html,
     )
+
+
+@app.route("/profile-image")
+def profile_image():
+    # Proxy the profile image bytes from S3 with browser-cache headers.
+    # Output: flask.Response (image bytes) or 404
+    try:
+        data, content_type = storage.get_binary(PROFILE_IMAGE_KEY)
+    except ClientError:
+        abort(404)
+
+    if not content_type:
+        content_type = "image/jpeg"  # str fallback
+
+    resp = Response(data, mimetype=content_type)
+    # Browser may cache for 1 hour; matches the in-memory TTL roughly.
+    resp.headers["Cache-Control"] = "public, max-age=3600"
+    return resp
+
+
+@app.context_processor
+def inject_globals():
+    # Make the profile image URL available to every template.
+    # Output: dict
+    return {"profile_image_url": "/profile-image"}
 
 
 @app.route("/healthz")
