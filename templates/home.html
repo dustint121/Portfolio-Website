@@ -12,39 +12,41 @@
     </p>
 </section>
 
+{% if posts %}
 <section class="card-list" aria-label="Recent posts">
-    <article class="card">
-        <h3 class="card-title">Sample Post Title</h3>
-        <p class="card-excerpt">
-            A short excerpt for a recent post will appear here. 
-        </p>
-        <div class="card-meta">
-            <span class="meta-item">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-                May 7, 2026
-            </span>
-            <span class="meta-item">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h6l2 2h10v11H3z"/></svg>
-                Projects
-            </span>
-        </div>
-    </article>
-
-    <article class="card">
-        <h3 class="card-title">Another Sample Post</h3>
-        <p class="card-excerpt">
-            Placeholder excerpt for demonstration. 
-        </p>
-        <div class="card-meta">
-            <span class="meta-item">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-                May 1, 2026
-            </span>
-            <span class="meta-item">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h9l5 5v13H6z"/><path d="M14 3v6h6"/></svg>
-                Notes
-            </span>
-        </div>
-    </article>
+    {% for post in posts %}
+    <a class="card-link" href="{{ url_for('post_page', section=post.section, slug=post.slug) }}">
+        <article class="card">
+            <h3 class="card-title">{{ post.title }}</h3>
+            {% if post.summary %}
+            <p class="card-excerpt">{{ post.summary }}</p>
+            {% endif %}
+            <div class="card-meta">
+                {% if post.date_iso %}
+                <span class="meta-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                    {{ post.date_iso }}
+                </span>
+                {% endif %}
+                <span class="meta-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h6l2 2h10v11H3z"/></svg>
+                    {{ post.section }}
+                </span>
+                {% if post.tags %}
+                <span class="meta-tags">
+                    {% for tag in post.tags %}
+                    <span class="tag-pill">{{ tag }}</span>
+                    {% endfor %}
+                </span>
+                {% endif %}
+            </div>
+        </article>
+    </a>
+    {% endfor %}
 </section>
+{% else %}
+<section class="empty-state">
+    <p>No posts yet. Upload a Markdown file to your bucket to see it here.</p>
+</section>
+{% endif %}
 {% endblock %}

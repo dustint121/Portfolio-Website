@@ -22,6 +22,7 @@ Each Markdown file is expected to start with YAML front matter:
 """
 
 import os
+import time
 from datetime import date, datetime
 from functools import lru_cache
 
@@ -43,6 +44,13 @@ BUCKET_NAME = os.getenv("MEGA_BUCKET_NAME")
 
 # Folder prefixes inside the bucket. Tuple of strings, capitalized to match S3 keys.
 SECTIONS = ("Projects", "Notes")
+
+# How long (seconds) to cache parsed posts in memory. int.
+CACHE_TTL_SECONDS = 300
+
+# Module-level cache.
+# _cache : dict mapping str (section name) -> tuple(float timestamp, list of Post)
+_cache = {}
 
 
 # ----- Data model -----------------------------------------------------------
@@ -234,15 +242,44 @@ def get_post(key):
     return _parse(key, obj["Body"].read())
 
 
-def list_posts(section):
+def list_posts(section, use_cache=True):
     """Fetch and parse every Markdown file in a section, newest first.
 
-    Input:  section : str - "Projects" or "Notes"
+    Inputs:
+        section   : str  - "Projects" or "Notes"
+        use_cache : bool - read/write the in-memory TTL cache when True
     Output: list of Post
     """
+    now = time.time()  # float
+    if use_cache:
+        cached = _cache.get(section)  # tuple or None
+        if cached and (now - cached[0]) < CACHE_TTL_SECONDS:
+            return cached[1]
+
     posts = [get_post(k) for k in list_keys(section)]  # list of Post
     posts.sort(key=lambda p: (p.date or date.min), reverse=True)
+    if use_cache:
+        _cache[section] = (now, posts)
     return posts
+
+
+def get_post_by_slug(section, slug, use_cache=True):
+    """Look up a single post by section + slug.
+    Inputs:
+        section   : str
+        slug      : str  - filename without .md extension
+        use_cache : bool
+    Output: Post or None
+    """
+    for p in list_posts(section, use_cache=use_cache):
+        if p.slug == slug:
+            return p
+    return None
+
+
+def clear_cache():
+    """Drop the in-memory cache so the next read goes back to S3."""
+    _cache.clear()
 
 
 def list_all_posts():

@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+
+{% block title %}Not Found &middot; Portfolio{% endblock %}
+{% block breadcrumb %}
+    <a href="{{ url_for('home') }}">Home</a>
+    <span class="crumb-sep">/</span>
+    <span>Not found</span>
+{% endblock %}
+
+{% block content %}
+<section class="empty-state">
+    <h2>404</h2>
+    <p>That page doesn't exist. Try the <a href="{{ url_for('home') }}">home page</a>.</p>
+</section>
+{% endblock %}
