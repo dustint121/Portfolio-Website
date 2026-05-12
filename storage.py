@@ -186,8 +186,15 @@ def _parse(key, raw_bytes):
     fm = frontmatter.loads(text)      # frontmatter.Post
     meta = dict(fm.metadata)          # dict (front-matter keys -> values)
 
-    section, _, filename = key.partition("/")  # all str
-    slug = os.path.splitext(filename)[0]       # str
+
+    # Keys at the bucket root have no "/" and thus no section.
+    if "/" in key:
+        section, _, filename = key.partition("/")  # all str
+    else:
+        section = ""        # str
+        filename = key      # str
+    slug = os.path.splitext(filename)[0]           # str
+
 
     known_keys = {"title", "date", "tags", "summary", "author"}  # set of str
     extra = {k: v for k, v in meta.items() if k not in known_keys}  # dict
@@ -240,6 +247,27 @@ def get_post(key):
     client = get_client()
     obj = client.get_object(Bucket=BUCKET_NAME, Key=key)  # dict
     return _parse(key, obj["Body"].read())
+
+
+# Cache for single posts fetched by key (e.g. the About page at the bucket root).
+# _single_post_cache : dict mapping str (key) -> tuple(float timestamp, Post)
+_single_post_cache = {}
+def get_post_cached(key, use_cache=True):
+    """Same as get_post(), but with a TTL cache. Use for single, stable keys.
+    Inputs:
+        key       : str  - full S3 key
+        use_cache : bool
+    Output: Post
+    """
+    now = time.time()  # float
+    if use_cache:
+        cached = _single_post_cache.get(key)  # tuple or None
+        if cached and (now - cached[0]) < CACHE_TTL_SECONDS:
+            return cached[1]
+    post = get_post(key)  # Post
+    if use_cache:
+        _single_post_cache[key] = (now, post)
+    return post
 
 
 def list_posts(section, use_cache=True):

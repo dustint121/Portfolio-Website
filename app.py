@@ -7,6 +7,9 @@ from rendering import render_markdown
 # S3 key for the profile picture stored at the bucket root. str.
 PROFILE_IMAGE_KEY = "profile_image.jpg"
 
+# S3 key for the About page markdown stored at the bucket root. str.
+ABOUT_KEY = "About_Me.md"
+
 app = Flask(__name__)
 
 
@@ -92,6 +95,25 @@ def post_page(section, slug):
         active_page=section.lower(),
         post=post,
         body_html=body_html,
+    )
+
+
+@app.route("/about")
+def about_page():
+    # Output: rendered HTML for the About page
+    try:
+        post = storage.get_post_cached(ABOUT_KEY)  # Post
+    except ClientError:
+        abort(404)
+    body_html = render_markdown(post.body)  # str
+    return render_template(
+        "post.html",
+        active_page="about",
+        post=post,
+        body_html=body_html,
+        breadcrumb_label="About",
+        # Static page: hide date + tags meta line.
+        hide_meta=True,
     )
 
 
