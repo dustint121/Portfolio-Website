@@ -1,0 +1,28 @@
+{# Renders a single post card. Expects `post` (storage.Post) in context. #}
+<a class="card-link" href="{{ url_for('post_page', section=post.section, slug=post.slug) }}">
+    <article class="card">
+        <h3 class="card-title">{{ post.title }}</h3>
+        {% if post.summary %}
+        <p class="card-excerpt">{{ post.summary }}</p>
+        {% endif %}
+        <div class="card-meta">
+            {% if post.date_iso %}
+            <span class="meta-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                {{ post.date_iso }}
+            </span>
+            {% endif %}
+            <span class="meta-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h6l2 2h10v11H3z"/></svg>
+                {{ post.section }}
+            </span>
+            {% if post.tags %}
+            <span class="meta-tags">
+                {% for tag in post.tags %}
+                <span class="tag-pill">{{ tag }}</span>
+                {% endfor %}
+            </span>
+            {% endif %}
+        </div>
+    </article>
+</a>

@@ -221,6 +221,12 @@ a { color: inherit; text-decoration: none; }
     max-width: 640px;
 }
 
+.intro-count {
+    color: var(--text-subtle);
+    margin: 8px 0 0;
+    font-size: 13px;
+}
+
 .card-list {
     display: flex;
     flex-direction: column;

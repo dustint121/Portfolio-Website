@@ -29,6 +29,53 @@ def home():
     )
 
 
+# Per-section metadata used to title and describe the index pages.
+# dict mapping str (section name) -> dict with str keys "heading" and "intro"
+SECTION_META = {
+    "Projects": {
+        "heading": "Projects",
+        "intro": (
+            "Things I've built or am building. Each entry links to a longer "
+            "writeup with context, decisions, and what I learned."
+        ),
+    },
+    "Notes": {
+        "heading": "Notes",
+        "intro": (
+            "Shorter writeups, cheatsheets, and study notes I keep around "
+            "for my own reference. Posted here in case they're useful to others."
+        ),
+    },
+}
+
+
+@app.route("/projects")
+def projects_page():
+    # Output: rendered HTML for the Projects index
+    return _render_section("Projects")
+
+
+@app.route("/notes")
+def notes_page():
+    # Output: rendered HTML for the Notes index
+    return _render_section("Notes")
+
+
+def _render_section(section):
+    # Input:  section : str - "Projects" or "Notes"
+    # Output: rendered HTML
+    posts = storage.list_posts(section)  # list of Post
+    meta = SECTION_META[section]         # dict
+    return render_template(
+        "section.html",
+        active_page=section.lower(),
+        section=section,
+        heading=meta["heading"],
+        intro=meta["intro"],
+        posts=posts,
+    )
+
+
 @app.route("/<section>/<slug>")
 def post_page(section, slug):
     # section : str, slug : str

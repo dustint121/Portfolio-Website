@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ heading }} &middot; Portfolio{% endblock %}
+{% block breadcrumb %}
+    <a href="{{ url_for('home') }}">Home</a>
+    <span class="crumb-sep">/</span>
+    <span>{{ heading }}</span>
+{% endblock %}
+
+{% block content %}
+<section class="intro">
+    <h2 class="intro-title">{{ heading }}</h2>
+    <p class="intro-text">{{ intro }}</p>
+    <p class="intro-count">{{ posts|length }} {{ "post" if posts|length == 1 else "posts" }}</p>
+</section>
+
+{% if posts %}
+<section class="card-list" aria-label="{{ heading }} posts">
+    {% for post in posts %}
+        {% include 'partials/post_card.html' %}
+    {% endfor %}
+</section>
+{% else %}
+<section class="empty-state">
+    <p>Nothing in {{ heading }} yet. Upload a Markdown file under the
+       <code>{{ section }}/</code> prefix in your bucket.</p>
+</section>
+{% endif %}
+{% endblock %}
