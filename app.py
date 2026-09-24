@@ -16,6 +16,9 @@ ABOUT_KEY = "About_Me.md"
 RESUME_FILENAME = "Dustin_Tran_Resume.pdf"
 RESUME_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
 
+FAVICON_FILENAME = "favicon.ico"
+FAVICON_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
+
 app = Flask(__name__)
 
 
@@ -147,6 +150,16 @@ def resume():
     if not os.path.isfile(os.path.join(RESUME_DIR, RESUME_FILENAME)):
         abort(404)
     return send_from_directory(RESUME_DIR, RESUME_FILENAME, mimetype="application/pdf")
+
+
+@app.route("/favicon.ico")
+def favicon():
+    # Serve the browser-tab icon straight from the local "assets" folder.
+    if not os.path.isfile(os.path.join(FAVICON_DIR, FAVICON_FILENAME)):
+        abort(404)
+    return send_from_directory(
+        FAVICON_DIR, FAVICON_FILENAME, mimetype="image/vnd.microsoft.icon"
+    )
 
 
 @app.context_processor
