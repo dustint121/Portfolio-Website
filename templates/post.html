@@ -4,15 +4,24 @@
 {% block breadcrumb %}
     <a href="{{ url_for('home') }}">Home</a>
     <span class="crumb-sep">/</span>
+    {% if post.section == 'Projects' %}
+    <a href="{{ url_for('projects_page') }}">{{ post.section }}</a>
+    {% elif post.section == 'Notes' %}
+    <a href="{{ url_for('notes_page') }}">{{ post.section }}</a>
+    {% elif post.section %}
     <span>{{ post.section }}</span>
+    {% endif %}
+    {% if post.section %}
     <span class="crumb-sep">/</span>
-    <span>{{ post.title }}</span>
+    {% endif %}
+    <span>{{ breadcrumb_label or post.title }}</span>
 {% endblock %}
 
 {% block content %}
 <article class="post">
     <header class="post-header">
         <h1 class="post-title">{{ post.title }}</h1>
+        {% if not hide_meta %}
         <div class="post-meta">
             {% if post.date_iso %}
             <span class="meta-item">
@@ -31,6 +40,7 @@
             </span>
             {% endif %}
         </div>
+        {% endif %}
     </header>
 
     <div class="post-body markdown">

@@ -1,4 +1,6 @@
-from flask import Flask, Response, abort, jsonify, render_template
+import os
+
+from flask import Flask, Response, abort, jsonify, render_template, send_from_directory
 from botocore.exceptions import ClientError
 
 import storage
@@ -9,6 +11,10 @@ PROFILE_IMAGE_KEY = "profile_image.jpg"
 
 # S3 key for the About page markdown stored at the bucket root. str.
 ABOUT_KEY = "About_Me.md"
+
+
+RESUME_FILENAME = "Dustin_Tran_Resume.pdf"
+RESUME_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
 
 app = Flask(__name__)
 
@@ -133,6 +139,14 @@ def profile_image():
     # Browser may cache for 1 hour; matches the in-memory TTL roughly.
     resp.headers["Cache-Control"] = "public, max-age=3600"
     return resp
+
+
+@app.route("/" + RESUME_FILENAME)
+def resume():
+    # Serve the resume PDF straight from the local "assets" folder
+    if not os.path.isfile(os.path.join(RESUME_DIR, RESUME_FILENAME)):
+        abort(404)
+    return send_from_directory(RESUME_DIR, RESUME_FILENAME, mimetype="application/pdf")
 
 
 @app.context_processor
