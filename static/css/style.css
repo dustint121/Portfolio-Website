@@ -273,6 +273,7 @@ a { color: inherit; text-decoration: none; }
 
 /* ---------- Card link wrapper ---------- */
 .card-link { display: block; color: inherit; }
+.card-link[hidden] { display: none; }
 .card-link:hover .card { border-color: var(--text-subtle); transform: translateY(-1px); }
 
 
@@ -435,4 +436,87 @@ a { color: inherit; text-decoration: none; }
         border-bottom: 1px solid var(--border);
     }
     .main { padding: 24px 20px 48px; }
+}
+/* ---------- Search + tag filter bar ---------- */
+.search-bar {
+    margin-bottom: 24px;
+}
+.search-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+.search-icon {
+    position: absolute;
+    left: 12px;
+    width: 16px;
+    height: 16px;
+    color: var(--text-subtle);
+    pointer-events: none;
+}
+.search-input {
+    width: 100%;
+    padding: 10px 36px 10px 36px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 14px;
+    font-family: inherit;
+    transition: border-color 0.15s ease;
+}
+.search-input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+.search-input::placeholder {
+    color: var(--text-subtle);
+}
+.search-clear {
+    position: absolute;
+    right: 8px;
+    width: 22px;
+    height: 22px;
+    border: none;
+    background: transparent;
+    color: var(--text-subtle);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    border-radius: 6px;
+}
+.search-clear:hover {
+    background: var(--surface-hover);
+    color: var(--text-muted);
+}
+.tag-filter-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+}
+.tag-chip {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.5;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.tag-chip:hover {
+    border-color: var(--accent);
+}
+.tag-chip.active {
+    background: var(--accent);
+    color: #fff;
+}
+.search-empty-state {
+    margin-top: 16px;
+    color: var(--text-subtle);
+    font-size: 14px;
 }

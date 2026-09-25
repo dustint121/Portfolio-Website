@@ -1,5 +1,9 @@
 {# Renders a single post card. Expects `post` (storage.Post) in context. #}
-<a class="card-link" href="{{ url_for('post_page', section=post.section, slug=post.slug) }}">
+{# data-search-text and data-tags feed the client-side search/filter bar. #}
+<a class="card-link"
+   href="{{ url_for('post_page', section=post.section, slug=post.slug) }}"
+   data-search-text="{{ (post.title ~ ' ' ~ post.summary ~ ' ' ~ post.search_text)|lower }}"
+   data-tags="{{ post.tags|join(',')|lower }}">
     <article class="card">
         <h3 class="card-title">{{ post.title }}</h3>
         {% if post.summary %}

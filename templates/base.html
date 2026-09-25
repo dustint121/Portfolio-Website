@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Portfolio{% endblock %}</title>
-    <link rel="icon" type="image/x-icon" href="{{ url_for('favicon') }}">
+    <link rel="icon" type="image/x-icon" href="{{ favicon_url }}">
+    <link rel="shortcut icon" type="image/x-icon" href="{{ favicon_url }}">
     <script>
         // Apply persisted theme before first paint to avoid flash.
         (function () {
@@ -39,5 +40,6 @@
     </div>
 
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/search.js') }}"></script>
 </body>
 </html>

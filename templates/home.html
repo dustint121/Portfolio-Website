@@ -13,7 +13,8 @@
 </section>
 
 {% if posts %}
-<section class="card-list" aria-label="Recent posts">
+{% include 'partials/search_bar.html' %}
+<section class="card-list" id="card-list" aria-label="Recent posts">
     {% for post in posts %}
         {% include 'partials/post_card.html' %}
     {% endfor %}

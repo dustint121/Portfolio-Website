@@ -155,18 +155,40 @@ def resume():
 @app.route("/favicon.ico")
 def favicon():
     # Serve the browser-tab icon straight from the local "assets" folder.
-    if not os.path.isfile(os.path.join(FAVICON_DIR, FAVICON_FILENAME)):
+    favicon_path = os.path.join(FAVICON_DIR, FAVICON_FILENAME)  # str
+    if not os.path.isfile(favicon_path):
         abort(404)
-    return send_from_directory(
+    resp = send_from_directory(
         FAVICON_DIR, FAVICON_FILENAME, mimetype="image/vnd.microsoft.icon"
     )
+    # Cache for a long time once a browser does pick it up correctly.
+    # Chrome caches favicons very aggressively and sometimes ignores a
+    # fresh fetch entirely; the cache-busting "v" query param on the
+    # <link> tag (see inject_globals + base.html) is what actually forces
+    # a refetch when the file changes, not this header.
+    resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    return resp
 
 
 @app.context_processor
 def inject_globals():
-    # Make the profile image URL available to every template.
+    # Make the profile image URL and a cache-busted favicon URL available
+    # to every template. Chrome caches favicons very aggressively per
+    # origin and often ignores normal cache headers, so the favicon URL
+    # carries a "v" query param derived from the file's mtime -- if you
+    # replace assets/favicon.ico, this value changes and Chrome is forced
+    # to treat it as a new resource instead of reusing a stale one.
     # Output: dict
-    return {"profile_image_url": "/profile-image"}
+    favicon_path = os.path.join(FAVICON_DIR, FAVICON_FILENAME)  # str
+    try:
+        favicon_version = int(os.path.getmtime(favicon_path))  # int
+    except OSError:
+        favicon_version = 0  # int fallback if the file is missing
+
+    return {
+        "profile_image_url": "/profile-image",
+        "favicon_url": "/favicon.ico?v=" + str(favicon_version),
+    }
 
 
 @app.route("/healthz")

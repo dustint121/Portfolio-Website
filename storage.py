@@ -31,6 +31,8 @@ import frontmatter
 from botocore.exceptions import ClientError
 from dotenv import load_dotenv
 
+from rendering import strip_markdown
+
 load_dotenv()
 
 # ----- Config ---------------------------------------------------------------
@@ -105,6 +107,13 @@ class Post:
     def date_iso(self):
         # Returns: str ("" when date is missing, else ISO 8601 date string)
         return self.date.isoformat() if self.date else ""
+
+    @property
+    def search_text(self):
+        # Plain-text version of the body, used for client-side full-text
+        # search (see templates/partials/post_card.html data-search-text).
+        # Returns: str
+        return strip_markdown(self.body)
 
 
 # ----- Client ---------------------------------------------------------------
