@@ -1,7 +1,10 @@
 {# Renders a single post card. Expects `post` (storage.Post) in context. #}
-{# data-search-text and data-tags feed the client-side search/filter bar. #}
+{# data-title, data-search-text and data-tags feed the client-side search/filter bar. #}
+{# data-title is title-only text; data-search-text is title + summary + body,
+   used when the "title only" toggle in search_bar.html is switched off. #}
 <a class="card-link"
    href="{{ url_for('post_page', section=post.section, slug=post.slug) }}"
+   data-title="{{ post.title|lower }}"
    data-search-text="{{ (post.title ~ ' ' ~ post.summary ~ ' ' ~ post.search_text)|lower }}"
    data-tags="{{ post.tags|join(',')|lower }}">
     <article class="card">

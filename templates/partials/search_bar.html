@@ -15,24 +15,40 @@
 
 {% if posts %}
 <section class="search-bar" data-search-root="true">
-    <div class="search-input-wrap">
-        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-        <input
-            type="text"
-            id="search-input"
-            class="search-input"
-            placeholder="Search title or text..."
-            autocomplete="off"
-            aria-label="Search posts by title or text">
-        <button type="button" id="search-clear" class="search-clear" aria-label="Clear search" hidden>&times;</button>
+    <div class="search-row">
+        <div class="search-input-wrap">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input
+                type="text"
+                id="search-input"
+                class="search-input"
+                placeholder="Search title or text..."
+                autocomplete="off"
+                aria-label="Search posts by title or text">
+            <button type="button" id="search-clear" class="search-clear" aria-label="Clear search" hidden>&times;</button>
+        </div>
+        <button
+            type="button"
+            id="title-only-toggle"
+            class="title-only-toggle"
+            aria-pressed="false"
+            title="Search titles only">
+            Title only
+        </button>
     </div>
 
     {% if sorted_tags %}
-    <div class="tag-filter-list" role="group" aria-label="Filter by tag">
-        {% for tag in sorted_tags %}
-        <button type="button" class="tag-chip" data-tag="{{ tag|lower }}">{{ tag }}</button>
-        {% endfor %}
-    </div>
+    <details class="tag-filter-details">
+        <summary class="tag-filter-summary">
+            Filter by tag
+            <span class="tag-filter-count" id="tag-filter-count" hidden></span>
+        </summary>
+        <div class="tag-filter-list" role="group" aria-label="Filter by tag">
+            {% for tag in sorted_tags %}
+            <button type="button" class="tag-chip" data-tag="{{ tag|lower }}">{{ tag }}</button>
+            {% endfor %}
+        </div>
+    </details>
     {% endif %}
 
     <p class="search-empty-state" id="search-empty-state" hidden>No posts match your search.</p>
