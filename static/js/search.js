@@ -21,6 +21,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const tagFilterCount = document.getElementById('tag-filter-count');
     const tagChips = Array.from(root.querySelectorAll('.tag-chip'));
     const cards = Array.from(cardList.querySelectorAll('.card-link'));
+    // Pagination nav sits right after the card list and only makes sense
+    // for the full, unfiltered page -- it is server-rendered from ALL posts,
+    // not just the ones currently loaded in the DOM, so it can't reflect a
+    // client-side filter. Hide it while a filter is active, restore it when
+    // the filter is cleared. May be null on a page with a single pagination
+    // page (partial renders nothing) -- guarded below.
+    const paginationNav = cardList.parentElement
+        ? cardList.parentElement.querySelector('.pagination')
+        : null;
 
     // Set of currently active (selected) tag names, lowercase. Set of str.
     const activeTags = new Set();
@@ -58,12 +67,24 @@ document.addEventListener('DOMContentLoaded', () => {
             if (visible) visibleCount += 1;
         });
 
+        const filterActive = query !== '' || activeTags.size > 0;  // bool
+
         emptyState.hidden = visibleCount !== 0;
-        clearBtn.hidden = query === '' && activeTags.size === 0;
+        clearBtn.hidden = !filterActive;
+
+        // Pagination reflects the server-side, unfiltered full post list --
+        // it can't account for a client-side filter that only touches the
+        // current page's cards, so hide it while filtering and bring it back
+        // once the filter clears.
+        if (paginationNav) {
+            paginationNav.hidden = filterActive;
+        }
 
         if (introCount) {
             const label = visibleCount === 1 ? 'post' : 'posts';
-            introCount.textContent = `${visibleCount} ${label}`;
+            introCount.textContent = filterActive
+                ? `${visibleCount} ${label} on this page`
+                : `${visibleCount} ${label}`;
         }
     };
 

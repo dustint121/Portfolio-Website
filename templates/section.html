@@ -11,7 +11,7 @@
 <section class="intro">
     <h2 class="intro-title">{{ heading }}</h2>
     <p class="intro-text">{{ intro }}</p>
-    <p class="intro-count" id="intro-count">{{ posts|length }} {{ "post" if posts|length == 1 else "posts" }}</p>
+    <p class="intro-count" id="intro-count">{{ total_count }} {{ "post" if total_count == 1 else "posts" }}</p>
 </section>
 
 {% if posts %}
@@ -21,6 +21,7 @@
         {% include 'partials/post_card.html' %}
     {% endfor %}
 </section>
+{% include 'partials/pagination.html' %}
 {% else %}
 <section class="empty-state">
     <p>Nothing in {{ heading }} yet. Upload a Markdown file under the

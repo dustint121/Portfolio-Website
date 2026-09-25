@@ -1,6 +1,6 @@
 import os
 
-from flask import Flask, Response, abort, jsonify, render_template, send_from_directory
+from flask import Flask, Response, abort, jsonify, render_template, request, send_from_directory
 from botocore.exceptions import ClientError
 
 import storage
@@ -16,28 +16,77 @@ ABOUT_KEY = "About_Me.md"
 RESUME_FILENAME = "Dustin_Tran_Resume.pdf"
 RESUME_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
 
+# Favicon shown in the browser tab, also a local file under assets/. str, str
 FAVICON_FILENAME = "favicon.ico"
 FAVICON_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
+
+# How many posts are shown on a single page of Home/Projects/Notes before
+# pagination controls (Previous / page numbers / Next) kick in. Change this
+# to alter the page size everywhere at once. int.
+POSTS_PER_PAGE = 10
 
 app = Flask(__name__)
 
 
+def _paginate(items, page):
+    # Slice a list of Post into one page and compute pagination metadata.
+    # Inputs:
+    #   items : list of Post - already sorted newest-first
+    #   page  : int - 1-based page number requested by the caller
+    # Output: tuple of (list of Post - the page's items,
+    #                    dict - {page, total_pages, has_prev, has_next,
+    #                            prev_page, next_page, total_count})
+    total_count = len(items)  # int
+    total_pages = max(1, (total_count + POSTS_PER_PAGE - 1) // POSTS_PER_PAGE)  # int
+    page = max(1, min(page, total_pages))  # int, clamped into range
+    start = (page - 1) * POSTS_PER_PAGE  # int
+    end = start + POSTS_PER_PAGE         # int
+    page_items = items[start:end]        # list of Post
+    pagination = {
+        "page": page,
+        "total_pages": total_pages,
+        "has_prev": page > 1,
+        "has_next": page < total_pages,
+        "prev_page": page - 1,
+        "next_page": page + 1,
+        "total_count": total_count,
+    }
+    return page_items, pagination
+
+
+def _get_page_param():
+    # Read and validate the "?page=" query parameter shared by every
+    # paginated route. Output: int - 1 if missing/invalid/less than 1.
+    raw = request.args.get("page", "1")  # str
+    try:
+        page = int(raw)
+    except (TypeError, ValueError):
+        page = 1
+    return max(1, page)
+
+
 @app.route("/")
 def home():
-    # Pull both sections; show the most recent N items together as the
-    # home-page feed (mirrors the reference site's behavior).
+    # Pull both sections and merge into one newest-first feed, then show
+    # one page's worth (POSTS_PER_PAGE) with pagination controls for the rest.
     projects = storage.list_posts("Projects")  # list of Post
     notes = storage.list_posts("Notes")        # list of Post
     feed = sorted(
         projects + notes,
         key=lambda p: (p.date is None, p.date),  # None dates sink to the bottom
         reverse=True,
-    )[:10]  # list of Post (top 10)
+    )  # list of Post, full newest-first feed
+
+    page = _get_page_param()  # int
+    page_posts, pagination = _paginate(feed, page)
 
     return render_template(
         "home.html",
         active_page="home",
-        posts=feed,
+        posts=page_posts,
+        pagination=pagination,
+        pagination_endpoint="home",
+        pagination_endpoint_kwargs={},
     )
 
 
@@ -76,15 +125,23 @@ def notes_page():
 def _render_section(section):
     # Input:  section : str - "Projects" or "Notes"
     # Output: rendered HTML
-    posts = storage.list_posts(section)  # list of Post
-    meta = SECTION_META[section]         # dict
+    all_posts = storage.list_posts(section)  # list of Post, full newest-first
+    meta = SECTION_META[section]             # dict
+
+    page = _get_page_param()  # int
+    page_posts, pagination = _paginate(all_posts, page)
+
     return render_template(
         "section.html",
         active_page=section.lower(),
         section=section,
         heading=meta["heading"],
         intro=meta["intro"],
-        posts=posts,
+        posts=page_posts,
+        total_count=len(all_posts),
+        pagination=pagination,
+        pagination_endpoint="projects_page" if section == "Projects" else "notes_page",
+        pagination_endpoint_kwargs={},
     )
 
 
@@ -155,6 +212,7 @@ def resume():
 @app.route("/favicon.ico")
 def favicon():
     # Serve the browser-tab icon straight from the local "assets" folder.
+    # Output: flask.Response (ICO bytes) or 404
     favicon_path = os.path.join(FAVICON_DIR, FAVICON_FILENAME)  # str
     if not os.path.isfile(favicon_path):
         abort(404)
@@ -170,14 +228,29 @@ def favicon():
     return resp
 
 
+def _static_version(*relative_path_parts):
+    # Compute a cache-busting version number from a static file's mtime.
+    # Inputs:  relative_path_parts : str... - joined under the Flask app's
+    #          static folder, e.g. _static_version("css", "style.css")
+    # Output: int - the file's mtime (whole seconds), or 0 if missing.
+    path = os.path.join(app.static_folder, *relative_path_parts)  # str
+    try:
+        return int(os.path.getmtime(path))
+    except OSError:
+        return 0  # int fallback if the file is missing
+
+
 @app.context_processor
 def inject_globals():
-    # Make the profile image URL and a cache-busted favicon URL available
-    # to every template. Chrome caches favicons very aggressively per
-    # origin and often ignores normal cache headers, so the favicon URL
-    # carries a "v" query param derived from the file's mtime -- if you
-    # replace assets/favicon.ico, this value changes and Chrome is forced
-    # to treat it as a new resource instead of reusing a stale one.
+    # Make the profile image URL and cache-busted asset URLs available to
+    # every template. Browsers (and any reverse proxy / CDN in front of the
+    # deployed app) can cache CSS/JS/favicon aggressively and sometimes
+    # ignore normal Cache-Control headers, so every asset URL carries a "v"
+    # query param derived from that file's mtime -- editing the file changes
+    # this value, which forces a refetch instead of reusing a stale cached
+    # copy. This is why a change can render correctly right after a local
+    # `python app.py` run (no stale cache yet) but look outdated on a
+    # deployed server that already cached the old file.
     # Output: dict
     favicon_path = os.path.join(FAVICON_DIR, FAVICON_FILENAME)  # str
     try:
@@ -188,6 +261,9 @@ def inject_globals():
     return {
         "profile_image_url": "/profile-image",
         "favicon_url": "/favicon.ico?v=" + str(favicon_version),
+        "style_css_url": "/static/css/style.css?v=" + str(_static_version("css", "style.css")),
+        "main_js_url": "/static/js/main.js?v=" + str(_static_version("js", "main.js")),
+        "search_js_url": "/static/js/search.js?v=" + str(_static_version("js", "search.js")),
     }
 
 
