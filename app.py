@@ -1,13 +1,13 @@
 import os
 
-from flask import Flask, Response, abort, jsonify, render_template, request, send_from_directory
+from flask import Flask, Response, abort, jsonify, render_template, send_from_directory
 from botocore.exceptions import ClientError
 
 import storage
 from rendering import render_markdown
 
-# S3 key for the profile picture stored at the bucket root. str.
-PROFILE_IMAGE_KEY = "profile_image.jpg"
+PROFILE_IMAGE_FILENAME = "profile_image.jpg"
+PROFILE_IMAGE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
 
 # S3 key for the About page markdown stored at the bucket root. str.
 ABOUT_KEY = "About_Me.md"
@@ -21,54 +21,23 @@ FAVICON_FILENAME = "favicon.ico"
 FAVICON_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
 
 # How many posts are shown on a single page of Home/Projects/Notes before
-# pagination controls (Previous / page numbers / Next) kick in. Change this
-# to alter the page size everywhere at once. int.
+# pagination controls (Previous / page numbers / Next) kick in. Passed to
+# the templates as `posts_per_page` and read by static/js/search.js, which
+# does the actual paging client-side over ALL of a page's posts -- change
+# this one value to alter the page size everywhere at once. int.
 POSTS_PER_PAGE = 10
 
 app = Flask(__name__)
 
 
-def _paginate(items, page):
-    # Slice a list of Post into one page and compute pagination metadata.
-    # Inputs:
-    #   items : list of Post - already sorted newest-first
-    #   page  : int - 1-based page number requested by the caller
-    # Output: tuple of (list of Post - the page's items,
-    #                    dict - {page, total_pages, has_prev, has_next,
-    #                            prev_page, next_page, total_count})
-    total_count = len(items)  # int
-    total_pages = max(1, (total_count + POSTS_PER_PAGE - 1) // POSTS_PER_PAGE)  # int
-    page = max(1, min(page, total_pages))  # int, clamped into range
-    start = (page - 1) * POSTS_PER_PAGE  # int
-    end = start + POSTS_PER_PAGE         # int
-    page_items = items[start:end]        # list of Post
-    pagination = {
-        "page": page,
-        "total_pages": total_pages,
-        "has_prev": page > 1,
-        "has_next": page < total_pages,
-        "prev_page": page - 1,
-        "next_page": page + 1,
-        "total_count": total_count,
-    }
-    return page_items, pagination
-
-
-def _get_page_param():
-    # Read and validate the "?page=" query parameter shared by every
-    # paginated route. Output: int - 1 if missing/invalid/less than 1.
-    raw = request.args.get("page", "1")  # str
-    try:
-        page = int(raw)
-    except (TypeError, ValueError):
-        page = 1
-    return max(1, page)
-
-
 @app.route("/")
 def home():
-    # Pull both sections and merge into one newest-first feed, then show
-    # one page's worth (POSTS_PER_PAGE) with pagination controls for the rest.
+    # Pull both sections and merge into one newest-first feed. All posts are
+    # rendered into the page; pagination AND search/tag filtering both run
+    # client-side (static/js/search.js) over that same full set, so paging
+    # through results and filtering results stay consistent with each other
+    # -- neither one is limited to whatever happened to be on the current
+    # server-rendered page.
     projects = storage.list_posts("Projects")  # list of Post
     notes = storage.list_posts("Notes")        # list of Post
     feed = sorted(
@@ -77,16 +46,11 @@ def home():
         reverse=True,
     )  # list of Post, full newest-first feed
 
-    page = _get_page_param()  # int
-    page_posts, pagination = _paginate(feed, page)
-
     return render_template(
         "home.html",
         active_page="home",
-        posts=page_posts,
-        pagination=pagination,
-        pagination_endpoint="home",
-        pagination_endpoint_kwargs={},
+        posts=feed,
+        posts_per_page=POSTS_PER_PAGE,
     )
 
 
@@ -128,20 +92,18 @@ def _render_section(section):
     all_posts = storage.list_posts(section)  # list of Post, full newest-first
     meta = SECTION_META[section]             # dict
 
-    page = _get_page_param()  # int
-    page_posts, pagination = _paginate(all_posts, page)
-
+    # All posts are rendered into the page; pagination AND search/tag
+    # filtering both run client-side over that same full set (see home()
+    # above for why).
     return render_template(
         "section.html",
         active_page=section.lower(),
         section=section,
         heading=meta["heading"],
         intro=meta["intro"],
-        posts=page_posts,
+        posts=all_posts,
         total_count=len(all_posts),
-        pagination=pagination,
-        pagination_endpoint="projects_page" if section == "Projects" else "notes_page",
-        pagination_endpoint_kwargs={},
+        posts_per_page=POSTS_PER_PAGE,
     )
 
 
@@ -185,19 +147,20 @@ def about_page():
 
 @app.route("/profile-image")
 def profile_image():
-    # Proxy the profile image bytes from S3 with browser-cache headers.
+    # Serve the profile picture straight from the local "assets" folder
+    # (see PROFILE_IMAGE_DIR comment above) instead of fetching it from
+    # S3-compatible storage on every request.
     # Output: flask.Response (image bytes) or 404
-    try:
-        data, content_type = storage.get_binary(PROFILE_IMAGE_KEY)
-    except ClientError:
+    profile_image_path = os.path.join(PROFILE_IMAGE_DIR, PROFILE_IMAGE_FILENAME)  # str
+    if not os.path.isfile(profile_image_path):
         abort(404)
-
-    if not content_type:
-        content_type = "image/jpeg"  # str fallback
-
-    resp = Response(data, mimetype=content_type)
-    # Browser may cache for 1 hour; matches the in-memory TTL roughly.
-    resp.headers["Cache-Control"] = "public, max-age=3600"
+    resp = send_from_directory(
+        PROFILE_IMAGE_DIR, PROFILE_IMAGE_FILENAME, mimetype="image/jpeg"
+    )
+    # Cache-busting "v" query param (see inject_globals + base.html pattern)
+    # already forces a refetch when the file changes, so this header can
+    # cache aggressively without risking a stale image after an update.
+    resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
     return resp
 
 
@@ -258,8 +221,14 @@ def inject_globals():
     except OSError:
         favicon_version = 0  # int fallback if the file is missing
 
+    profile_image_path = os.path.join(PROFILE_IMAGE_DIR, PROFILE_IMAGE_FILENAME)  # str
+    try:
+        profile_image_version = int(os.path.getmtime(profile_image_path))  # int
+    except OSError:
+        profile_image_version = 0  # int fallback if the file is missing
+
     return {
-        "profile_image_url": "/profile-image",
+        "profile_image_url": "/profile-image?v=" + str(profile_image_version),
         "favicon_url": "/favicon.ico?v=" + str(favicon_version),
         "style_css_url": "/static/css/style.css?v=" + str(_static_version("css", "style.css")),
         "main_js_url": "/static/js/main.js?v=" + str(_static_version("js", "main.js")),
