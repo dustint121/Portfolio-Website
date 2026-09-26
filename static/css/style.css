@@ -426,6 +426,111 @@ a { color: inherit; text-decoration: none; }
 
 
 
+/* ---------- Post layout + table of contents ---------- */
+/* .post takes the markdown column (already capped at 760px via .markdown);
+   .toc-panel sits in the remaining free space to the right, sticking to
+   the viewport while the post body scrolls past it. */
+.post-layout {
+    display: flex;
+    align-items: flex-start;
+    gap: 32px;
+}
+.post-layout .post {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.toc-panel {
+    flex: 0 0 240px;
+    width: 240px;
+    position: sticky;
+    /* Lines up with the top of the post title, just below the topbar. */
+    top: 28px;
+    align-self: flex-start;
+    max-height: calc(100vh - 56px);
+}
+.toc-inner {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+}
+.toc-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 14px;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    text-align: left;
+}
+.toc-toggle:hover { background: var(--surface-hover); }
+.toc-toggle-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    transition: transform 0.15s ease;
+}
+/* Expanded state: chevron points down. Collapsed: points left (icon
+   rotated back to "closed"), panel shrinks to just the toggle button. */
+.toc-toggle[aria-expanded="true"] .toc-toggle-icon { transform: rotate(90deg); }
+.toc-toggle[aria-expanded="false"] .toc-toggle-icon { transform: rotate(0deg); }
+
+.toc-scroll {
+    max-height: calc(100vh - 100px);
+    overflow-y: auto;
+    padding: 10px 6px 14px 0;
+}
+.toc-panel.toc-collapsed .toc-scroll { display: none; }
+.toc-panel.toc-collapsed .toc-inner { border-radius: 10px; }
+.toc-panel.toc-collapsed .toc-toggle { border-bottom: none; }
+
+.toc-list {
+    list-style: none;
+    margin: 0;
+    padding: 0 0 0 14px;
+}
+.toc-item > .toc-list { padding-left: 14px; }
+.toc-item { margin: 0; }
+
+.toc-link {
+    display: block;
+    padding: 5px 10px 5px 8px;
+    margin: 1px 0;
+    border-left: 2px solid transparent;
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 1.4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.toc-link:hover {
+    color: var(--text);
+    background: var(--surface-hover);
+}
+.toc-link.toc-active {
+    color: var(--accent);
+    border-left-color: var(--accent);
+    background: var(--accent-soft);
+    font-weight: 600;
+}
+/* Sub-levels get progressively smaller/lighter so the hierarchy reads
+   at a glance even without opening every branch. */
+.toc-level-1 > .toc-link { font-weight: 600; }
+.toc-level-3 .toc-link, .toc-level-4 .toc-link, .toc-level-5 .toc-link, .toc-level-6 .toc-link {
+    font-size: 12px;
+}
+
 /* ---------- Responsive ---------- */
 @media (max-width: 860px) {
     .layout { grid-template-columns: 1fr; }
@@ -436,6 +541,11 @@ a { color: inherit; text-decoration: none; }
         border-bottom: 1px solid var(--border);
     }
     .main { padding: 24px 20px 48px; }
+    /* No room for a persistent side panel on narrow screens -- the
+       collapse toggle isn't useful either since there's nothing to
+       reclaim space from, so the whole panel is hidden here. */
+    .post-layout { flex-direction: column; }
+    .toc-panel { display: none; }
 }
 /* ---------- Search + tag filter bar ---------- */
 .search-bar {

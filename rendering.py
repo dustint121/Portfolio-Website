@@ -30,14 +30,51 @@ def render_markdown(text):
     Input:  text : str - Markdown body (front matter already stripped)
     Output: str  - rendered HTML
     """
+    html, _toc = render_markdown_with_toc(text)
+    return html
+
+
+def render_markdown_with_toc(text):
+    """Render a Markdown string to HTML, plus the heading structure needed
+    for an in-page table of contents.
+
+    The "toc" extension already assigns each rendered heading (h1-h6) a
+    unique "id" attribute for anchor links (e.g. <h2 id="ddl-vs-dml">) --
+    this just also hands back its parsed toc_tokens tree, which already
+    matches those same ids, so the caller doesn't need to re-parse the
+    rendered HTML to build a table of contents.
+
+    Input:  text : str - Markdown body (front matter already stripped)
+    Output: tuple of (str  - rendered HTML,
+                       list of dict - nested toc tree; each dict has
+                       "level" (int, 1-6), "id" (str, matches the heading's
+                       HTML id), "name" (str, heading text) and "children"
+                       (list of dict, same shape, possibly empty))
+    """
     if not text:
-        return ""
+        return "", []
     md = markdown.Markdown(
         extensions=_EXTENSIONS,
         extension_configs=_EXTENSION_CONFIGS,
         output_format="html5",
     )
-    return md.convert(text)
+    html = md.convert(text)
+    toc_tokens = md.toc_tokens  # list of dict, nested by heading level
+    return html, toc_tokens
+
+
+def count_toc_headings(toc_tokens):
+    """Count every heading in a toc_tokens tree (including nested ones).
+
+    Input:  toc_tokens : list of dict - as returned by
+            render_markdown_with_toc, each with a "children" list
+    Output: int - total heading count across all levels
+    """
+    total = 0  # int
+    for item in toc_tokens:
+        total += 1
+        total += count_toc_headings(item.get("children") or [])
+    return total
 
 
 # Matches Markdown/HTML markup we want stripped for the search index: code

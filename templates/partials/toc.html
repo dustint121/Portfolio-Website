@@ -1,0 +1,36 @@
+{# Collapsible "Contents" panel for a post page, rendered in the free space
+   to the right of the (narrower, max-width: 760px) markdown body.
+   Expects `toc` (list of dict, from rendering.render_markdown_with_toc) in
+   context -- each dict has "level" (int), "id" (str, matches a heading's
+   HTML id in body_html), "name" (str) and "children" (list of dict, same
+   shape). `toc` is only passed in (non-empty) by app.py's post_page() when
+   the post has 2+ headings -- a table of contents isn't useful for a post
+   with just one section (or none) -- so this template just needs to check
+   truthiness. Active-heading highlighting and the collapse/expand toggle
+   are handled by static/js/toc.js. #}
+{% macro render_toc_list(items) %}
+<ul class="toc-list">
+    {% for item in items %}
+    <li class="toc-item toc-level-{{ item.level }}">
+        <a class="toc-link" href="#{{ item.id }}" data-toc-id="{{ item.id }}" title="{{ item.name }}">{{ item.name }}</a>
+        {% if item.children %}
+        {{ render_toc_list(item.children) }}
+        {% endif %}
+    </li>
+    {% endfor %}
+</ul>
+{% endmacro %}
+
+{% if toc %}
+<aside class="toc-panel" id="toc-panel" data-toc-root="true">
+    <div class="toc-inner">
+        <button type="button" class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-scroll" title="Collapse table of contents">
+            <span class="toc-toggle-label">Contents</span>
+            <svg class="toc-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+        <nav class="toc-scroll" id="toc-scroll" aria-label="Table of contents">
+            {{ render_toc_list(toc) }}
+        </nav>
+    </div>
+</aside>
+{% endif %}

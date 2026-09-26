@@ -4,8 +4,12 @@ from flask import Flask, Response, abort, jsonify, render_template, send_from_di
 from botocore.exceptions import ClientError
 
 import storage
-from rendering import render_markdown
+from rendering import render_markdown, render_markdown_with_toc, count_toc_headings
 
+# Profile picture is served straight from the local "assets" folder (like
+# the resume PDF and favicon below) instead of fetched from S3-compatible
+# storage (Mega S4) -- fetching it remotely was adding noticeable load time.
+# str, str
 PROFILE_IMAGE_FILENAME = "profile_image.jpg"
 PROFILE_IMAGE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
 
@@ -117,12 +121,20 @@ def post_page(section, slug):
     if post is None:
         abort(404)
 
-    body_html = render_markdown(post.body)  # str
+    # toc is the nested heading tree (see rendering.render_markdown_with_toc)
+    # used to render the collapsible "Contents" panel in the right sidebar
+    # -- built from the same markdown parse pass as body_html, so heading
+    # ids always line up between the two. A table of contents isn't useful
+    # for a post with 0 or 1 headings, so it's omitted entirely then.
+    body_html, toc = render_markdown_with_toc(post.body)  # str, list of dict
+    if count_toc_headings(toc) <= 1:
+        toc = []
     return render_template(
         "post.html",
         active_page=section.lower(),
         post=post,
         body_html=body_html,
+        toc=toc,
     )
 
 
@@ -233,6 +245,7 @@ def inject_globals():
         "style_css_url": "/static/css/style.css?v=" + str(_static_version("css", "style.css")),
         "main_js_url": "/static/js/main.js?v=" + str(_static_version("js", "main.js")),
         "search_js_url": "/static/js/search.js?v=" + str(_static_version("js", "search.js")),
+        "toc_js_url": "/static/js/toc.js?v=" + str(_static_version("js", "toc.js")),
     }
 
 
