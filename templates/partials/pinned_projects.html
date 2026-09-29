@@ -1,0 +1,40 @@
+{# Collapsible "Pinned Projects" section for the home page, shown between
+   the welcome text and the search bar -- best work first, so a visitor
+   doesn't need to click into Projects to see flagship work.
+   Expects `pinned_projects` (list of dict, see app.PINNED_PROJECTS) in
+   context. Collapse/expand is handled by static/js/pinned_projects.js,
+   which persists the open/closed state per-browser via localStorage,
+   the same pattern used by the table-of-contents panel on post pages. #}
+{% if pinned_projects %}
+<section class="pinned-projects" id="pinned-projects">
+    <button type="button" class="pinned-toggle" id="pinned-toggle" aria-expanded="true" aria-controls="pinned-body" title="Collapse pinned projects">
+        <span class="pinned-toggle-left">
+            <svg class="pinned-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+            <span class="pinned-toggle-label">Pinned Projects</span>
+        </span>
+        <span class="pinned-toggle-hint">best work first</span>
+    </button>
+
+    <div class="pinned-body" id="pinned-body">
+        <div class="pinned-grid">
+            {% for project in pinned_projects %}
+            <a class="pinned-card"
+               href="{{ url_for('post_page', section=project.section, slug=project.slug) }}">
+                <div class="pinned-card-image-wrap">
+                    <img class="pinned-card-image" src="/assets/{{ project.image }}" alt="{{ project.title }} preview" loading="lazy">
+                </div>
+                <div class="pinned-card-body">
+                    <h3 class="pinned-card-title">{{ project.title }}</h3>
+                    <p class="pinned-card-summary">{{ project.summary }}</p>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+
+        <a class="pinned-view-all" href="{{ url_for('projects_page') }}">
+            View All Projects
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+    </div>
+</section>
+{% endif %}

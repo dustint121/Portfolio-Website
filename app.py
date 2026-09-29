@@ -17,6 +17,32 @@ PROFILE_IMAGE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "as
 ABOUT_KEY = "About_Me.md"
 
 
+ASSETS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
+# "Pinned Projects" shown in a collapsible section on the home page, above
+# the search bar 
+#   title   : str  - card heading
+#   summary : str  - one-line description shown under the title
+#   section : str  - "Projects" or "Notes" (matches storage.SECTIONS)
+#   slug    : str  - matches the post's filename (without .md) exactly
+#   image   : str  - filename under assets/, served via /assets/<image>
+PINNED_PROJECTS = [
+    {
+        "title": "Image Colorization",
+        "summary": "A PyTorch model that restores color to black-and-white photos.",
+        "section": "Projects",
+        "slug": "Colorization Project",
+        "image": "colorization_project_example.png",
+    },
+    {
+        "title": "Market Return Viewer",
+        "summary": "An interactive treemap for exploring S&P 500 constituent returns.",
+        "section": "Projects",
+        "slug": "Market Viewer Project",
+        "image": "market_viewer_project_example.png",
+    },
+]
+
+
 RESUME_FILENAME = "Dustin_Tran_Resume.pdf"
 RESUME_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
 
@@ -55,6 +81,7 @@ def home():
         active_page="home",
         posts=feed,
         posts_per_page=POSTS_PER_PAGE,
+        pinned_projects=PINNED_PROJECTS,
     )
 
 
@@ -176,6 +203,24 @@ def profile_image():
     return resp
 
 
+@app.route("/assets/<filename>")
+def pinned_project_asset(filename):
+    # Serve a pinned-project preview image straight from the local
+    # "assets" folder. Only filenames explicitly listed in a
+    # PINNED_PROJECTS entry are servable 
+    # Input:  filename : str
+    # Output: flask.Response (image bytes) or 404
+    allowed = {p["image"] for p in PINNED_PROJECTS}  # set of str
+    if filename not in allowed:
+        abort(404)
+    asset_path = os.path.join(ASSETS_DIR, filename)  # str
+    if not os.path.isfile(asset_path):
+        abort(404)
+    resp = send_from_directory(ASSETS_DIR, filename)
+    resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    return resp
+
+
 @app.route("/" + RESUME_FILENAME)
 def resume():
     # Serve the resume PDF straight from the local "assets" folder
@@ -246,6 +291,7 @@ def inject_globals():
         "main_js_url": "/static/js/main.js?v=" + str(_static_version("js", "main.js")),
         "search_js_url": "/static/js/search.js?v=" + str(_static_version("js", "search.js")),
         "toc_js_url": "/static/js/toc.js?v=" + str(_static_version("js", "toc.js")),
+        "pinned_projects_js_url": "/static/js/pinned_projects.js?v=" + str(_static_version("js", "pinned_projects.js")),
     }
 
 
