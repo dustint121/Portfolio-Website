@@ -1,13 +1,4 @@
-{# Pagination controls: Previous / page-number links / Next.
-   Entirely driven by static/js/search.js -- pagination now runs
-   client-side over ALL of a page's post cards (see app.py's home()/
-   _render_section(), which render every post rather than one server-side
-   page), so it can react to search/tag filtering instead of being stuck
-   with whatever posts happened to load on the current server page.
-   `data-posts-per-page` carries app.POSTS_PER_PAGE so there is a single
-   source of truth for the page size. Hidden by default; the JS unhides
-   it and fills in the "Previous"/number/"Next" controls once it knows
-   how many pages the (possibly filtered) result set needs. #}
+{# Pagination controls: Previous / page-number links / Next.#}
 <nav class="pagination" id="pagination-nav" data-posts-per-page="{{ posts_per_page }}" hidden aria-label="Pagination">
     <button type="button" class="page-link page-link-prev" id="page-prev">&larr; Previous</button>
     <span class="page-numbers" id="page-numbers"></span>

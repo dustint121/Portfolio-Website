@@ -21,7 +21,9 @@ Each Markdown file is expected to start with YAML front matter:
     Body in Markdown...
 """
 
+import logging
 import os
+import threading
 import time
 from datetime import date, datetime
 from functools import lru_cache
@@ -47,12 +49,38 @@ BUCKET_NAME = os.getenv("MEGA_BUCKET_NAME")
 # Folder prefixes inside the bucket. Tuple of strings, capitalized to match S3 keys.
 SECTIONS = ("Projects", "Notes")
 
-# How long (seconds) to cache parsed posts in memory. int.
+# How long (seconds) cached posts count as "fresh". Once older than this, the
+# cached copy is still served immediately (stale-while-revalidate) while a
+# background thread checks the bucket for changes. int.
 CACHE_TTL_SECONDS = 300
 
-# Module-level cache.
-# _cache : dict mapping str (section name) -> tuple(float timestamp, list of Post)
+# After a FAILED background refresh (e.g. the bucket is unreachable), wait
+# this many seconds before trying again so an outage is not hit on every
+# request. The stale copy keeps being served meanwhile. int.
+FAILED_REFRESH_RETRY_SECONDS = 30
+
+logger = logging.getLogger(__name__)
+
+# Module-level caches.
+# _cache : dict mapping str (cache name) -> tuple(float timestamp, value)
+#   cache names: "section:<Section>" -> value is list of Post
+#                "single:<S3 key>"   -> value is Post
 _cache = {}
+
+# Parsed posts remembered by S3 key, along with the ETag they were parsed
+# from. A refresh compares the bucket listing's ETag to this one and skips
+# downloading files whose ETag has not changed.
+# _post_cache : dict mapping str (S3 key) -> tuple(str etag, Post)
+_post_cache = {}
+
+# One refresh at a time per cache name, so concurrent visitors on a cold
+# cache wait for a single download pass instead of each doing their own.
+# _refresh_locks : dict mapping str (cache name) -> threading.Lock
+_refresh_locks = {}
+# Cache names that currently have a background refresh running. set of str
+_refreshing = set()
+# Guards _refresh_locks, _refreshing and _cache writes. threading.Lock
+_state_lock = threading.Lock()
 
 
 # ----- Data model -----------------------------------------------------------
@@ -225,11 +253,12 @@ def _parse(key, raw_bytes):
 # ----- Public API -----------------------------------------------------------
 
 
-def list_keys(section):
-    """List all `.md` object keys under a section prefix.
+def list_objects(section):
+    """List all `.md` objects under a section prefix, with their ETags.
 
     Input:  section : str - "Projects" or "Notes"
-    Output: list of str
+    Output: list of tuple(str key, str etag). The ETag changes whenever the
+            file's contents change, so it is used to skip unchanged files.
     """
     if section not in SECTIONS:
         raise ValueError(f"Unknown section: {section}. Expected one of {SECTIONS}.")
@@ -238,13 +267,35 @@ def list_keys(section):
     prefix = f"{section}/"  # str
     paginator = client.get_paginator("list_objects_v2")
 
-    keys = []  # list of str
+    objects = []  # list of tuple(str, str)
     for page in paginator.paginate(Bucket=BUCKET_NAME, Prefix=prefix):
         for obj in page.get("Contents", []) or []:
             key = obj["Key"]  # str
             if key.lower().endswith(".md") and key != prefix:
-                keys.append(key)
-    return keys
+                objects.append((key, obj.get("ETag") or ""))
+    return objects
+
+
+def list_keys(section):
+    """List all `.md` object keys under a section prefix.
+
+    Input:  section : str - "Projects" or "Notes"
+    Output: list of str
+    """
+    return [key for key, _etag in list_objects(section)]
+
+
+def _fetch_post(key):
+    """Download and parse one Markdown file.
+
+    Input:  key : str - full S3 key
+    Output: tuple(str etag, Post). The ETag comes from the same response as
+            the body, so the pair always matches.
+    """
+    client = get_client()
+    obj = client.get_object(Bucket=BUCKET_NAME, Key=key)  # dict
+    etag = obj.get("ETag") or ""                          # str
+    return etag, _parse(key, obj["Body"].read())
 
 
 def get_post(key):
@@ -253,51 +304,179 @@ def get_post(key):
     Input:  key : str - full S3 key
     Output: Post
     """
-    client = get_client()
-    obj = client.get_object(Bucket=BUCKET_NAME, Key=key)  # dict
-    return _parse(key, obj["Body"].read())
+    return _fetch_post(key)[1]
 
 
-# Cache for single posts fetched by key (e.g. the About page at the bucket root).
-# _single_post_cache : dict mapping str (key) -> tuple(float timestamp, Post)
-_single_post_cache = {}
+# ----- Stale-while-revalidate machinery ---------------------------------------
+
+
+def _lock_for(name):
+    # Input: name : str - cache name. Output: threading.Lock (one per name)
+    with _state_lock:
+        lock = _refresh_locks.get(name)  # threading.Lock or None
+        if lock is None:
+            lock = threading.Lock()
+            _refresh_locks[name] = lock
+        return lock
+
+
+def _store(name, value):
+    # Save a freshly built value under a cache name, stamped with now.
+    # Inputs: name : str, value : list of Post or Post
+    with _state_lock:
+        _cache[name] = (time.time(), value)
+
+
+def _refresh_in_background(name, refresh_fn):
+    """Start a background refresh unless one is already running for `name`.
+
+    Visitors keep getting the stale cached value meanwhile. If the refresh
+    fails, the stale value is kept and the next attempt is delayed by
+    FAILED_REFRESH_RETRY_SECONDS.
+
+    Inputs: name       : str - cache name
+            refresh_fn : callable taking one float (the start time) that
+                         rebuilds and stores the value for `name`
+    """
+    with _state_lock:
+        if name in _refreshing:
+            return
+        _refreshing.add(name)
+
+    def run():
+        try:
+            refresh_fn(time.time())
+        except Exception:
+            logger.exception("Background refresh failed for %s; serving stale copy", name)
+            with _state_lock:
+                cached = _cache.get(name)  # tuple or None
+                if cached:
+                    # Backdate the timestamp so the copy counts as stale
+                    # again only after FAILED_REFRESH_RETRY_SECONDS.
+                    retry_stamp = time.time() - CACHE_TTL_SECONDS + FAILED_REFRESH_RETRY_SECONDS  # float
+                    _cache[name] = (retry_stamp, cached[1])
+        finally:
+            with _state_lock:
+                _refreshing.discard(name)
+
+    threading.Thread(target=run, name=f"refresh-{name}", daemon=True).start()
+
+
+def _refresh_section(section, started_at):
+    """Rebuild a section's post list, downloading only new or changed files.
+
+    One list call returns every file with its ETag. A file whose ETag
+    matches the remembered one reuses its parsed Post with no download.
+    Files no longer in the listing disappear from the result.
+
+    Inputs: section    : str   - "Projects" or "Notes"
+            started_at : float - when the caller began waiting; if another
+                         refresh finished after this, its result is reused
+    Output: list of Post, newest first
+    """
+    name = f"section:{section}"  # str
+    with _lock_for(name):
+        cached = _cache.get(name)  # tuple or None
+        if cached and cached[0] >= started_at:
+            return cached[1]  # someone else just refreshed while we waited
+
+        objects = list_objects(section)  # list of tuple(str, str)
+        posts = []                       # list of Post
+        for key, etag in objects:
+            remembered = _post_cache.get(key)  # tuple(str, Post) or None
+            if remembered and etag and remembered[0] == etag:
+                posts.append(remembered[1])
+            else:
+                new_etag, post = _fetch_post(key)
+                _post_cache[key] = (new_etag, post)
+                posts.append(post)
+
+        # Forget parsed posts whose files were deleted from this section.
+        live_keys = {key for key, _etag in objects}  # set of str
+        prefix = f"{section}/"                        # str
+        for key in [k for k in _post_cache if k.startswith(prefix) and k not in live_keys]:
+            _post_cache.pop(key, None)
+
+        posts.sort(key=lambda p: (p.date or date.min), reverse=True)
+        _store(name, posts)
+        return posts
+
+
+def _refresh_single(key, started_at):
+    """Rebuild one standalone post (e.g. About page), skipping the download
+    if its ETag is unchanged (one cheap HEAD request instead of a GET).
+
+    Inputs: key : str - full S3 key, started_at : float (see above)
+    Output: Post
+    """
+    name = f"single:{key}"  # str
+    with _lock_for(name):
+        cached = _cache.get(name)  # tuple or None
+        if cached and cached[0] >= started_at:
+            return cached[1]
+
+        remembered = _post_cache.get(key)  # tuple(str, Post) or None
+        post = None  # Post or None
+        if remembered:
+            head = get_client().head_object(Bucket=BUCKET_NAME, Key=key)  # dict
+            current_etag = head.get("ETag") or ""                          # str
+            if current_etag and current_etag == remembered[0]:
+                post = remembered[1]
+        if post is None:
+            etag, post = _fetch_post(key)
+            _post_cache[key] = (etag, post)
+        _store(name, post)
+        return post
+
+
 def get_post_cached(key, use_cache=True):
-    """Same as get_post(), but with a TTL cache. Use for single, stable keys.
+    """Same as get_post(), but cached with stale-while-revalidate.
+
+    A fresh cached copy is returned as is. A stale one is returned
+    immediately and refreshed in the background. Only the very first call
+    (nothing cached yet) waits on the bucket.
+
     Inputs:
         key       : str  - full S3 key
-        use_cache : bool
+        use_cache : bool - False forces a blocking refresh
     Output: Post
     """
     now = time.time()  # float
+    name = f"single:{key}"  # str
     if use_cache:
-        cached = _single_post_cache.get(key)  # tuple or None
-        if cached and (now - cached[0]) < CACHE_TTL_SECONDS:
+        cached = _cache.get(name)  # tuple or None
+        if cached:
+            if (now - cached[0]) >= CACHE_TTL_SECONDS:
+                _refresh_in_background(name, lambda started_at: _refresh_single(key, started_at))
             return cached[1]
-    post = get_post(key)  # Post
-    if use_cache:
-        _single_post_cache[key] = (now, post)
-    return post
+    return _refresh_single(key, now)
 
 
 def list_posts(section, use_cache=True):
-    """Fetch and parse every Markdown file in a section, newest first.
+    """Return every Markdown post in a section, newest first.
+
+    Uses stale-while-revalidate: a fresh cached list is returned as is; a
+    stale one is returned immediately while a background thread re-checks the
+    bucket (downloading only changed files). Only the very first call after
+    a restart waits on the bucket, and then only for files not yet seen.
 
     Inputs:
         section   : str  - "Projects" or "Notes"
-        use_cache : bool - read/write the in-memory TTL cache when True
+        use_cache : bool - False forces a blocking refresh
     Output: list of Post
     """
-    now = time.time()  # float
-    if use_cache:
-        cached = _cache.get(section)  # tuple or None
-        if cached and (now - cached[0]) < CACHE_TTL_SECONDS:
-            return cached[1]
+    if section not in SECTIONS:
+        raise ValueError(f"Unknown section: {section}. Expected one of {SECTIONS}.")
 
-    posts = [get_post(k) for k in list_keys(section)]  # list of Post
-    posts.sort(key=lambda p: (p.date or date.min), reverse=True)
+    now = time.time()  # float
+    name = f"section:{section}"  # str
     if use_cache:
-        _cache[section] = (now, posts)
-    return posts
+        cached = _cache.get(name)  # tuple or None
+        if cached:
+            if (now - cached[0]) >= CACHE_TTL_SECONDS:
+                _refresh_in_background(name, lambda started_at: _refresh_section(section, started_at))
+            return cached[1]
+    return _refresh_section(section, now)
 
 
 def get_post_by_slug(section, slug, use_cache=True):
@@ -315,8 +494,10 @@ def get_post_by_slug(section, slug, use_cache=True):
 
 
 def clear_cache():
-    """Drop the in-memory cache so the next read goes back to S3."""
-    _cache.clear()
+    """Drop the in-memory caches so the next read goes back to S3."""
+    with _state_lock:
+        _cache.clear()
+        _post_cache.clear()
     _binary_cache.clear()
 
 
